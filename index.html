@@ -516,6 +516,7 @@ const OrnateFrame = ({ children, style={} }) => (
    ═══════════════════════════════════════════ */
 function WordSlayer() {
   const [screen, setScreen] = useState("title");
+  const [gameMode, setGameMode] = useState("easy"); // "easy" or "easyplus"
   const [playerLevel, setPlayerLevel] = useState(1);
   const [playerXp, setPlayerXp] = useState(0);
   const [xpToNext, setXpToNext] = useState(25);
@@ -542,6 +543,9 @@ function WordSlayer() {
   const [damageNum, setDamageNum] = useState(null);
   const [visualPop, setVisualPop] = useState(false);
   const [titleReady, setTitleReady] = useState(false);
+  const [timer, setTimer] = useState(10);
+  const [timerActive, setTimerActive] = useState(false);
+  const timerRef = useRef(null);
   const usedWords = useRef(new Set());
 
   useEffect(() => { setTimeout(() => setTitleReady(true), 100); }, []);
@@ -571,15 +575,50 @@ function WordSlayer() {
 
   const startBattle = useCallback(()=>{
     const m=pickMonster(playerLevel);
-    const hp = 50 + (playerLevel - 1) * 10; // Lv1=50, Lv2=60, etc.
+    const hp = 50 + (playerLevel - 1) * 10;
     setPlayerMaxHp(hp); setPlayerHp(hp);
     setMonster(m);setMonsterHp(m.maxHp);
     setCurrentWord(pickWord(getWordStage(playerLevel)));
     setTyped("");setCombo(0);setMaxCombo(0);
     setWordsThisBattle(0);setMistakesThisBattle(0);
     setBattleLog([]);setShowResult(false);setDefeatAnim(false);
-    setVisualPop(false);setGameOver(false);setScreen("battle");
+    setVisualPop(false);setGameOver(false);setTimer(10);setTimerActive(true);setScreen("battle");
   },[playerLevel,pickMonster,pickWord]);
+
+  // Timer countdown
+  useEffect(()=>{
+    if(timerRef.current) clearInterval(timerRef.current);
+    if(!timerActive||screen!=="battle"||showResult||defeatAnim||gameOver) return;
+    timerRef.current = setInterval(()=>{
+      setTimer(prev=>{
+        if(prev<=1){
+          // Time's up — player takes damage, next word
+          setMistakesThisBattle(p=>p+1); setCombo(0);
+          const missDmg = 10;
+          setPlayerHp(hp=>{
+            const newHp=Math.max(0,hp-missDmg);
+            if(newHp<=0) setTimeout(()=>setGameOver(true),400);
+            return newHp;
+          });
+          setPlayerDamageFlash(true);
+          setTimeout(()=>setPlayerDamageFlash(false),300);
+          // Next word
+          setCurrentWord(pickWord(getWordStage(playerLevel)));
+          setTyped("");
+          return 10;
+        }
+        return prev-1;
+      });
+    },1000);
+    return ()=>clearInterval(timerRef.current);
+  },[timerActive,screen,showResult,defeatAnim,gameOver,pickWord,playerLevel]);
+
+  // Reset timer on new word
+  useEffect(()=>{
+    if(currentWord&&screen==="battle"&&!showResult&&!defeatAnim&&!gameOver){
+      setTimer(10); setTimerActive(true);
+    }
+  },[currentWord]);
 
   useEffect(()=>{
     if(currentWord&&screen==="battle"&&!gameOver){
@@ -635,13 +674,13 @@ function WordSlayer() {
           const newHp=Math.max(0,monsterHp-dmg);
           setMonsterHp(newHp);
           if(newHp<=0){
-            setDefeatAnim(true);setTotalDefeated(p=>p+1);
+            setDefeatAnim(true);setTotalDefeated(p=>p+1);setTimerActive(false);
             const earned=monster.xp+Math.floor(maxCombo*3);
             const nx=playerXp+earned;
             if(nx>=xpToNext){
               setPlayerLevel(l=>l+1);setPlayerXp(nx-xpToNext);
               setXpToNext(x=>Math.floor(x*1.25));
-              setLevelUpShow(true);setTimeout(()=>setLevelUpShow(false),2200);
+              setLevelUpShow(true);setTimeout(()=>setLevelUpShow(false),3000);
             } else setPlayerXp(nx);
             setTimeout(()=>setShowResult(true),1300);
           } else {
@@ -704,7 +743,18 @@ function WordSlayer() {
     @keyframes hitBurst{0%{transform:scale(0.3);opacity:1}100%{transform:scale(2.5);opacity:0}}
     @keyframes damageFloat{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-60px) scale(1.3);opacity:0}}
     @keyframes fadeIn{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
-    @keyframes levelUp{0%{transform:translateY(0) scale(0.8);opacity:0}20%{transform:translateY(-20px) scale(1.2);opacity:1}80%{opacity:1}100%{transform:translateY(-80px) scale(1);opacity:0}}
+    @keyframes levelUp{
+      0%{transform:translateY(0) scale(0);opacity:0}
+      15%{transform:translateY(-10px) scale(1.8);opacity:1;filter:brightness(2)}
+      30%{transform:translateY(-20px) scale(1.2);filter:brightness(1.5)}
+      50%{transform:translateY(-30px) scale(1.5);filter:brightness(2)}
+      70%{transform:translateY(-40px) scale(1.3);filter:brightness(1.2)}
+      100%{transform:translateY(-80px) scale(1);opacity:0}
+    }
+    @keyframes levelUpBurst{0%{transform:scale(0);opacity:1}50%{opacity:0.6}100%{transform:scale(4);opacity:0}}
+    @keyframes levelUpRing{0%{transform:scale(0.5);opacity:1;border-width:6px}100%{transform:scale(3);opacity:0;border-width:1px}}
+    @keyframes timerPulse{0%,100%{transform:scaleX(1)}50%{transform:scaleX(1.02)}}
+    @keyframes timerDrain{0%{width:100%}100%{width:0%}}
     @keyframes visualPop{0%{transform:scale(0) rotate(-20deg);opacity:0}50%{transform:scale(1.3) rotate(5deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:1}}
     @keyframes glowPulse{0%,100%{box-shadow:0 0 15px var(--glow)}50%{box-shadow:0 0 30px var(--glow),0 0 60px var(--glow2)}}
     @keyframes titleSlide{0%{transform:translateY(30px);opacity:0}100%{transform:translateY(0);opacity:1}}
@@ -719,6 +769,21 @@ function WordSlayer() {
 
   // ─── TITLE ───
   if(screen==="title"){
+    const modeBtn = (mode, label, sublabel, icon, color) => (
+      <button onClick={()=>{setGameMode(mode);startBattle();}} style={{
+        fontFamily:ffJa,padding:"16px 20px",fontSize:15,fontWeight:900,
+        background:`linear-gradient(180deg, ${color} 0%, ${color}88 100%)`,
+        border:`2px solid ${color}88`,borderRadius:12,color:"#fff",cursor:"pointer",
+        boxShadow:`0 0 30px ${color}30, inset 0 1px 0 rgba(255,255,255,0.2)`,
+        transition:"all 0.2s",width:220,textAlign:"center",
+      }}
+        onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.05)";e.currentTarget.style.boxShadow=`0 0 50px ${color}50`;}}
+        onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";e.currentTarget.style.boxShadow=`0 0 30px ${color}30`;}}>
+        <div style={{fontSize:28,marginBottom:4}}>{icon}</div>
+        <div style={{fontFamily:ff,fontSize:16,letterSpacing:3}}>{label}</div>
+        <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",marginTop:4,fontWeight:400}}>{sublabel}</div>
+      </button>
+    );
     return (
       <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
         background:"radial-gradient(ellipse at 50% 30%, #1a1040 0%, #0a0a1a 50%, #000 100%)",
@@ -735,25 +800,24 @@ function WordSlayer() {
             background:"linear-gradient(180deg, #fde68a 0%, #f59e0b 40%, #b45309 100%)",
             WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
             letterSpacing:6,animation:"titleSlide 0.8s ease-out both"}}>WORD SLAYER</h1>
-          <p style={{fontSize:13,color:"rgba(251,191,36,0.6)",marginBottom:40,letterSpacing:8,fontWeight:700,
+          <p style={{fontSize:13,color:"rgba(251,191,36,0.6)",marginBottom:30,letterSpacing:8,fontWeight:700,
             animation:"titleSlide 0.8s ease-out 0.2s both"}}>英 単 語 タ イ ピ ン グ バ ト ル</p>
-          <OrnateFrame style={{marginBottom:28,animation:"titleSlide 0.8s ease-out 0.3s both"}}>
+          <OrnateFrame style={{marginBottom:24,animation:"titleSlide 0.8s ease-out 0.3s both"}}>
             <div style={{display:"flex",gap:24,fontSize:13,color:"#d4d4d8"}}>
               <span><span style={{color:"#a78bfa"}}>⚡</span> Lv.{playerLevel}</span>
               <span><span style={{color:"#ef4444"}}>🏆</span> {totalDefeated}体</span>
               <span><span style={{color:"#4ade80"}}>📝</span> {totalWords}語</span>
             </div>
           </OrnateFrame>
-          <button onClick={startBattle} style={{fontFamily:ff,padding:"18px 56px",fontSize:20,fontWeight:900,
-            background:"linear-gradient(180deg, #f59e0b 0%, #b45309 100%)",
-            border:"2px solid rgba(253,230,138,0.5)",borderRadius:12,color:"#fff",cursor:"pointer",letterSpacing:4,
-            boxShadow:"0 0 40px rgba(245,158,11,0.3), inset 0 1px 0 rgba(255,255,255,0.2)",
-            transition:"all 0.2s",animation:"titleSlide 0.8s ease-out 0.4s both"}}
-            onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.06)";e.currentTarget.style.boxShadow="0 0 60px rgba(245,158,11,0.5), inset 0 1px 0 rgba(255,255,255,0.3)";}}
-            onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";e.currentTarget.style.boxShadow="0 0 40px rgba(245,158,11,0.3), inset 0 1px 0 rgba(255,255,255,0.2)";}}>
-            BATTLE</button>
-          <p style={{fontSize:11,color:"#52525b",marginTop:28,letterSpacing:1,
-            animation:"titleSlide 0.8s ease-out 0.5s both"}}>外付けキーボードで英単語をタイプしてモンスターを倒せ</p>
+
+          {/* Mode Selection */}
+          <div style={{display:"flex",gap:14,marginBottom:20,animation:"titleSlide 0.8s ease-out 0.4s both"}}>
+            {modeBtn("easy","EASY","ヒント付きでタイプ","🛡️","#22c55e")}
+            {modeBtn("easyplus","EASY +","ヒントなし暗記モード","🔥","#f59e0b")}
+          </div>
+
+          <p style={{fontSize:11,color:"#52525b",marginTop:8,letterSpacing:1,
+            animation:"titleSlide 0.8s ease-out 0.5s both"}}>⏱️ 1問10秒の制限時間つき！</p>
         </div>
       </div>
     );
@@ -816,16 +880,41 @@ function WordSlayer() {
         </div>
         {combo>=2&&(<div style={{fontFamily:ff,fontSize:18,fontWeight:900,color:"#fbbf24",
           animation:"comboFire 1s ease-in-out infinite",letterSpacing:2}}>{combo} COMBO</div>)}
-        <div style={{fontSize:12,color:"#94a3b8"}}>⚔️ {wordsThisBattle}語</div>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{fontSize:10,padding:"3px 8px",borderRadius:4,fontWeight:700,letterSpacing:1,
+            background:gameMode==="easy"?"rgba(34,197,94,0.15)":"rgba(245,158,11,0.15)",
+            color:gameMode==="easy"?"#4ade80":"#fbbf24",
+            border:`1px solid ${gameMode==="easy"?"rgba(34,197,94,0.3)":"rgba(245,158,11,0.3)"}`}}>
+            {gameMode==="easy"?"EASY":"EASY+"}</div>
+          <div style={{fontSize:12,color:"#94a3b8"}}>⚔️ {wordsThisBattle}語</div>
+        </div>
       </div>
 
-      {/* Level Up */}
-      {levelUpShow&&(<div style={{position:"absolute",top:"18%",left:"50%",transform:"translateX(-50%)",
-        zIndex:20,textAlign:"center",animation:"levelUp 2.2s ease-out forwards"}}>
-        <div style={{fontFamily:ff,fontSize:36,fontWeight:900,color:"#fbbf24",
-          textShadow:"0 0 30px rgba(251,191,36,0.6), 0 0 60px rgba(251,191,36,0.3)"}}>LEVEL UP!</div>
-        <div style={{fontSize:16,color:"#fde68a",marginTop:4}}>Lv.{playerLevel}</div>
-      </div>)}
+      {/* Level Up — dramatic */}
+      {levelUpShow&&(<>
+        {/* Full screen flash */}
+        <div style={{position:"absolute",inset:0,zIndex:19,pointerEvents:"none",
+          background:"radial-gradient(circle at 50% 40%, rgba(251,191,36,0.4) 0%, transparent 70%)",
+          animation:"levelUpBurst 1.5s ease-out forwards"}} />
+        {/* Expanding ring */}
+        <div style={{position:"absolute",top:"35%",left:"50%",transform:"translate(-50%,-50%)",
+          width:100,height:100,borderRadius:"50%",border:"4px solid #fbbf24",
+          zIndex:19,pointerEvents:"none",animation:"levelUpRing 1.2s ease-out forwards"}} />
+        <div style={{position:"absolute",top:"35%",left:"50%",transform:"translate(-50%,-50%)",
+          width:100,height:100,borderRadius:"50%",border:"4px solid #f59e0b",
+          zIndex:19,pointerEvents:"none",animation:"levelUpRing 1.2s ease-out 0.2s forwards",opacity:0}} />
+        {/* Text */}
+        <div style={{position:"absolute",top:"22%",left:"50%",transform:"translateX(-50%)",
+          zIndex:21,textAlign:"center",animation:"levelUp 2.8s ease-out forwards"}}>
+          <div style={{fontSize:20,marginBottom:6}}>⚡✨⚡</div>
+          <div style={{fontFamily:ff,fontSize:44,fontWeight:900,color:"#fbbf24",
+            textShadow:"0 0 30px rgba(251,191,36,0.8), 0 0 60px rgba(251,191,36,0.5), 0 0 100px rgba(245,158,11,0.3)",
+            letterSpacing:6}}>LEVEL UP!</div>
+          <div style={{fontFamily:ff,fontSize:28,color:"#fde68a",marginTop:8,fontWeight:900,
+            textShadow:"0 0 20px rgba(253,230,138,0.5)"}}>Lv.{playerLevel}</div>
+          <div style={{fontSize:12,color:"#d4d4d8",marginTop:8}}>HP +10 回復!</div>
+        </div>
+      </>)}
 
       {/* Monster Stage */}
       <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
@@ -849,17 +938,6 @@ function WordSlayer() {
 
             {/* Monster + Visual */}
             <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              {currentWord&&!defeatAnim&&(
-                <div style={{position:"absolute",left:-110,top:"50%",transform:"translateY(-50%)",
-                  display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                  <div style={{fontSize:80,lineHeight:1,
-                    animation:visualPop?"visualPop 0.5s ease-out":"visualBob 3s ease-in-out infinite",
-                    filter:`drop-shadow(0 0 20px ${monster.glow}50)`}}>{currentWord.visual}</div>
-                  <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",
-                    background:"rgba(0,0,0,0.4)",padding:"2px 8px",borderRadius:4,
-                    backdropFilter:"blur(4px)"}}>{currentWord.ja}</div>
-                </div>
-              )}
               <div style={{
                 filter:`drop-shadow(0 0 30px ${monster.glow}40)`,
                 animation:shakeMonster?"shake 0.35s":"monsterIdle 3s ease-in-out infinite",
@@ -873,18 +951,46 @@ function WordSlayer() {
               {hitEffect&&(<div style={{position:"absolute",fontSize:70,
                 animation:"hitBurst 0.4s ease-out forwards",pointerEvents:"none"}}>💥</div>)}
             </div>
+
+            {/* Visual hint — between monster and input */}
+            {currentWord&&!defeatAnim&&(
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:10,marginTop:12}}>
+                <div style={{fontSize:80,lineHeight:1,
+                  animation:visualPop?"visualPop 0.5s ease-out":"visualBob 3s ease-in-out infinite",
+                  filter:`drop-shadow(0 0 20px ${monster.glow}50)`}}>{currentWord.visual}</div>
+                <div style={{fontSize:14,color:"rgba(255,255,255,0.6)",fontWeight:700,
+                  background:"rgba(0,0,0,0.4)",padding:"4px 12px",borderRadius:6,
+                  backdropFilter:"blur(4px)"}}>{currentWord.ja}</div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Word Input */}
       {!showResult&&!gameOver&&currentWord&&(
-        <div style={{padding:"20px 20px 28px",
+        <div style={{padding:"16px 20px 24px",
           background:"linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 70%, transparent 100%)",
           display:"flex",flexDirection:"column",alignItems:"center",position:"relative",zIndex:5}}>
+
+          {/* Timer bar — smooth CSS animation */}
+          <div style={{width:Math.min(target.length*57,340),height:6,background:"rgba(255,255,255,0.08)",
+            borderRadius:3,overflow:"hidden",marginBottom:12,
+            border:"1px solid rgba(255,255,255,0.06)"}}>
+            <div key={currentWord?.en+wordsThisBattle} style={{width:"100%",height:"100%",
+              background: timer>6?"linear-gradient(90deg,#4ade80,#22c55e)":timer>3?"linear-gradient(90deg,#fbbf24,#f59e0b)":"linear-gradient(90deg,#ef4444,#dc2626)",
+              borderRadius:3,
+              animation:"timerDrain 10s linear forwards",
+              boxShadow:timer<=3?`0 0 10px rgba(239,68,68,0.5)`:"none",
+            }}/>
+          </div>
+          {timer<=3&&(<div style={{fontSize:11,color:"#ef4444",fontWeight:900,marginBottom:4,
+            animation:"comboFire 0.5s ease-in-out infinite"}}>⏱️ {timer}秒!</div>)}
+
           <div style={{display:"flex",gap:5,marginBottom:14}}>
             {target.split("").map((ch,i)=>{
               const done=i<typed.length;const active=i===typed.length;
+              const showChar = gameMode==="easy" || done; // Easy+ hides untyped chars
               return (<div key={i} style={{
                 width:52,height:66,display:"flex",alignItems:"center",justifyContent:"center",
                 fontSize:36,fontFamily:"'Courier New', Courier, monospace",fontWeight:900,borderRadius:10,textTransform:"uppercase",
@@ -894,7 +1000,7 @@ function WordSlayer() {
                 border:done?"1px solid #4ade80":active?"1px solid rgba(251,191,36,0.35)":"1px solid rgba(255,255,255,0.05)",
                 boxShadow:done?"0 0 14px rgba(74,222,128,0.35), inset 0 1px 0 rgba(255,255,255,0.3)":active?"0 0 12px rgba(251,191,36,0.12)":"none",
                 transition:"all 0.12s",
-              }}>{ch}</div>);
+              }}>{showChar ? ch : (active ? "?" : "")}</div>);
             })}
           </div>
           <button onClick={e=>{e.stopPropagation();replaySound();}} style={{
