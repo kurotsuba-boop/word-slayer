@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Word Slayer - 英単語タイピングバトル</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+    body { background: #000; -webkit-tap-highlight-color: transparent; }
+  </style>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+/* ═══════════════════════════════════════════
+   SVG MONSTER COMPONENTS
+   ═══════════════════════════════════════════ */
+const MonsterSlime = ({ glow }) => (
+  <svg viewBox="0 0 200 200" width="160" height="160">
+    <defs>
+      <radialGradient id="slimeG" cx="50%" cy="40%" r="50%">
+        <stop offset="0%" stopColor="#86efac" />
+        <stop offset="60%" stopColor="#22c55e" />
+        <stop offset="100%" stopColor="#064e3b" />
+      </radialGradient>
+      <filter id="slimeGlow"><feGaussianBlur stdDeviation="4" /><feComposite in="SourceGraphic" /></filter>
+    </defs>
+    <ellipse cx="100" cy="175" rx="60" ry="10" fill="#22c55e" opacity="0.2" />
+    <path d="M40,140 Q30,100 50,70 Q60,50 80,45 Q100,40 120,45 Q140,50 150,70 Q170,100 160,140 Q155,160 140,165 Q120,172 100,170 Q80,172 60,165 Q45,160 40,140Z" fill="url(#slimeG)" filter="url(#slimeGlow)" />
+    <ellipse cx="75" cy="95" rx="12" ry="14" fill="#000" opacity="0.7" />
+    <ellipse cx="125" cy="95" rx="12" ry="14" fill="#000" opacity="0.7" />
+    <ellipse cx="78" cy="90" rx="5" ry="6" fill="#fff" opacity="0.9" />
+    <ellipse cx="128" cy="90" rx="5" ry="6" fill="#fff" opacity="0.9" />
+    <path d="M80,120 Q100,135 120,120" stroke="#064e3b" strokeWidth="3" fill="none" strokeLinecap="round" />
+    <ellipse cx="70" cy="60" rx="15" ry="8" fill="#fff" opacity="0.15" transform="rotate(-20,70,60)" />
+  </svg>
+);
+
+const MonsterBat = ({ glow }) => (
+  <svg viewBox="0 0 240 200" width="180" height="160">
+    <defs>
+      <linearGradient id="batG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#c084fc" />
+        <stop offset="100%" stopColor="#3b0764" />
+      </linearGradient>
+      <filter id="batGlow"><feGaussianBlur stdDeviation="3" /><feComposite in="SourceGraphic" /></filter>
+    </defs>
+    <ellipse cx="120" cy="185" rx="30" ry="6" fill="#a78bfa" opacity="0.15" />
+    {/* Wings */}
+    <path d="M120,90 Q80,50 30,40 Q45,65 40,80 Q35,95 20,100 Q40,105 50,95 Q60,110 55,130 Q75,110 90,100 Z" fill="url(#batG)" filter="url(#batGlow)" opacity="0.9" />
+    <path d="M120,90 Q160,50 210,40 Q195,65 200,80 Q205,95 220,100 Q200,105 190,95 Q180,110 185,130 Q165,110 150,100 Z" fill="url(#batG)" filter="url(#batGlow)" opacity="0.9" />
+    {/* Body */}
+    <ellipse cx="120" cy="105" rx="30" ry="35" fill="url(#batG)" />
+    {/* Head */}
+    <ellipse cx="120" cy="78" rx="22" ry="20" fill="#7c3aed" />
+    {/* Ears */}
+    <path d="M100,65 L92,38 L108,58Z" fill="#7c3aed" />
+    <path d="M140,65 L148,38 L132,58Z" fill="#7c3aed" />
+    {/* Eyes */}
+    <ellipse cx="110" cy="76" rx="6" ry="7" fill="#fbbf24" />
+    <ellipse cx="130" cy="76" rx="6" ry="7" fill="#fbbf24" />
+    <ellipse cx="111" cy="75" rx="3" ry="4" fill="#000" />
+    <ellipse cx="131" cy="75" rx="3" ry="4" fill="#000" />
+    {/* Fangs */}
+    <path d="M112,90 L115,98 L118,90" fill="#fff" opacity="0.9" />
+    <path d="M122,90 L125,98 L128,90" fill="#fff" opacity="0.9" />
+    {/* Feet */}
+    <path d="M108,138 Q105,150 100,155 Q108,152 110,145Z" fill="#5b21b6" />
+    <path d="M132,138 Q135,150 140,155 Q132,152 130,145Z" fill="#5b21b6" />
+  </svg>
+);
+
+const MonsterGoblin = ({ glow }) => (
+  <svg viewBox="0 0 200 220" width="150" height="170">
+    <defs>
+      <linearGradient id="gobG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#6d9b4e" />
+        <stop offset="100%" stopColor="#2d4a1a" />
+      </linearGradient>
+      <filter id="gobGlow"><feGaussianBlur stdDeviation="2" /><feComposite in="SourceGraphic" /></filter>
+    </defs>
+    <ellipse cx="100" cy="210" rx="35" ry="6" fill="#f87171" opacity="0.15" />
+    {/* Body */}
+    <path d="M70,120 Q65,150 68,180 L80,185 L85,155 L100,160 L115,155 L120,185 L132,180 Q135,150 130,120Z" fill="url(#gobG)" />
+    {/* Head */}
+    <ellipse cx="100" cy="85" rx="35" ry="32" fill="#7ab556" filter="url(#gobGlow)" />
+    {/* Ears - big pointed */}
+    <path d="M65,80 L30,60 L60,90Z" fill="#6d9b4e" />
+    <path d="M135,80 L170,60 L140,90Z" fill="#6d9b4e" />
+    {/* Eyes - angry */}
+    <path d="M78,72 L93,78" stroke="#2d4a1a" strokeWidth="3" strokeLinecap="round" />
+    <path d="M107,78 L122,72" stroke="#2d4a1a" strokeWidth="3" strokeLinecap="round" />
+    <ellipse cx="88" cy="82" rx="7" ry="8" fill="#fbbf24" />
+    <ellipse cx="112" cy="82" rx="7" ry="8" fill="#fbbf24" />
+    <circle cx="89" cy="83" r="4" fill="#7f1d1d" />
+    <circle cx="113" cy="83" r="4" fill="#7f1d1d" />
+    {/* Nose */}
+    <ellipse cx="100" cy="95" rx="5" ry="4" fill="#5a9340" />
+    {/* Mouth with fangs */}
+    <path d="M82,105 Q100,115 118,105" stroke="#2d4a1a" strokeWidth="2" fill="none" />
+    <path d="M88,105 L86,113 L91,107" fill="#fff" />
+    <path d="M112,105 L114,113 L109,107" fill="#fff" />
+    {/* Weapon - club */}
+    <rect x="135" y="100" width="8" height="55" rx="3" fill="#78350f" transform="rotate(15,139,127)" />
+    <ellipse cx="141" cy="98" rx="12" ry="10" fill="#6b5140" transform="rotate(15,141,98)" />
+    <circle cx="137" cy="93" r="3" fill="#9ca3af" />
+    <circle cx="146" cy="96" r="3" fill="#9ca3af" />
+  </svg>
+);
+
+const MonsterWolf = ({ glow }) => (
+  <svg viewBox="0 0 220 200" width="180" height="160">
+    <defs>
+      <linearGradient id="wolfG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#93c5fd" />
+        <stop offset="100%" stopColor="#1e3a5f" />
+      </linearGradient>
+      <filter id="wolfGlow"><feGaussianBlur stdDeviation="3" /><feComposite in="SourceGraphic" /></filter>
+    </defs>
+    <ellipse cx="115" cy="185" rx="50" ry="8" fill="#60a5fa" opacity="0.12" />
+    {/* Body */}
+    <path d="M60,120 Q55,100 65,85 Q75,75 95,75 L140,80 Q165,85 175,100 Q180,115 170,135 Q160,155 140,160 L80,155 Q60,150 60,120Z" fill="url(#wolfG)" filter="url(#wolfGlow)" />
+    {/* Tail */}
+    <path d="M170,120 Q190,105 200,80 Q195,100 185,115" stroke="#7db8f5" strokeWidth="8" fill="none" strokeLinecap="round" />
+    {/* Head */}
+    <path d="M50,105 Q30,85 25,65 Q35,80 50,80 Q40,65 42,45 Q50,65 60,70 Q55,60 60,50 L65,70 Q70,60 85,55 Q75,70 75,80 L95,75 Q85,85 75,95 Q60,100 50,105Z" fill="#7db8f5" />
+    {/* Ears */}
+    <path d="M50,75 L42,45 L62,68Z" fill="#93c5fd" />
+    <path d="M65,68 L60,42 L78,62Z" fill="#93c5fd" />
+    {/* Eye */}
+    <ellipse cx="58" cy="82" rx="6" ry="5" fill="#fbbf24" />
+    <ellipse cx="59" cy="82" rx="3" ry="4" fill="#000" />
+    {/* Nose */}
+    <ellipse cx="35" cy="85" rx="5" ry="4" fill="#1e293b" />
+    {/* Mouth */}
+    <path d="M35,90 Q45,98 55,93" stroke="#1e293b" strokeWidth="1.5" fill="none" />
+    {/* Fangs */}
+    <path d="M40,92 L39,98 L43,93" fill="#fff" opacity="0.9" />
+    {/* Legs */}
+    <rect x="80" y="155" width="10" height="25" rx="4" fill="#5a8ec4" />
+    <rect x="100" y="155" width="10" height="25" rx="4" fill="#5a8ec4" />
+    <rect x="130" y="155" width="10" height="25" rx="4" fill="#5a8ec4" />
+    <rect x="150" y="155" width="10" height="22" rx="4" fill="#5a8ec4" />
+    {/* Chest fur */}
+    <path d="M75,95 Q80,115 75,130 Q85,120 90,130 Q90,115 95,100" fill="#b4d5f7" opacity="0.5" />
+  </svg>
+);
+
+const MonsterDragon = ({ glow }) => (
+  <svg viewBox="0 0 240 220" width="190" height="175">
+    <defs>
+      <linearGradient id="dragG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#fde68a" />
+        <stop offset="50%" stopColor="#f59e0b" />
+        <stop offset="100%" stopColor="#78350f" />
+      </linearGradient>
+      <linearGradient id="dragWing" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.8" />
+        <stop offset="100%" stopColor="#78350f" stopOpacity="0.6" />
+      </linearGradient>
+      <filter id="dragGlow"><feGaussianBlur stdDeviation="4" /><feComposite in="SourceGraphic" /></filter>
+    </defs>
+    <ellipse cx="120" cy="210" rx="55" ry="8" fill="#fbbf24" opacity="0.12" />
+    {/* Wings */}
+    <path d="M95,90 Q50,40 20,25 Q40,55 35,70 Q25,80 15,85 Q35,88 45,80 Q50,95 45,110 Q65,95 80,85Z" fill="url(#dragWing)" />
+    <path d="M145,90 Q190,40 220,25 Q200,55 205,70 Q215,80 225,85 Q205,88 195,80 Q190,95 195,110 Q175,95 160,85Z" fill="url(#dragWing)" />
+    {/* Body */}
+    <ellipse cx="120" cy="130" rx="45" ry="40" fill="url(#dragG)" filter="url(#dragGlow)" />
+    {/* Belly */}
+    <ellipse cx="120" cy="140" rx="25" ry="25" fill="#fde68a" opacity="0.3" />
+    {/* Neck & Head */}
+    <path d="M100,95 Q95,70 90,55 Q95,40 110,35 L130,35 Q145,40 150,55 Q145,70 140,95Z" fill="url(#dragG)" />
+    {/* Horns */}
+    <path d="M100,40 Q92,20 88,8" stroke="#d97706" strokeWidth="4" fill="none" strokeLinecap="round" />
+    <path d="M140,40 Q148,20 152,8" stroke="#d97706" strokeWidth="4" fill="none" strokeLinecap="round" />
+    {/* Eyes */}
+    <ellipse cx="108" cy="52" rx="8" ry="6" fill="#ef4444" />
+    <ellipse cx="132" cy="52" rx="8" ry="6" fill="#ef4444" />
+    <ellipse cx="110" cy="52" rx="4" ry="5" fill="#000" />
+    <ellipse cx="134" cy="52" rx="4" ry="5" fill="#000" />
+    <ellipse cx="109" cy="50" rx="2" ry="2" fill="#fbbf24" />
+    <ellipse cx="133" cy="50" rx="2" ry="2" fill="#fbbf24" />
+    {/* Nostrils */}
+    <circle cx="112" cy="65" r="2.5" fill="#92400e" />
+    <circle cx="128" cy="65" r="2.5" fill="#92400e" />
+    {/* Mouth */}
+    <path d="M105,72 Q120,80 135,72" stroke="#92400e" strokeWidth="2" fill="none" />
+    {/* Spines */}
+    {[0,1,2,3,4].map(i => (
+      <path key={i} d={`M${117+i*1.5},${95+i*10} L${120},${87+i*10} L${123-i*1.5},${95+i*10}`} fill="#d97706" opacity={0.7-i*0.1} />
+    ))}
+    {/* Arms */}
+    <path d="M78,125 Q65,135 58,145 Q62,143 67,140 Q63,148 60,155 Q66,148 72,140 L80,135Z" fill="#d97706" />
+    <path d="M162,125 Q175,135 182,145 Q178,143 173,140 Q177,148 180,155 Q174,148 168,140 L160,135Z" fill="#d97706" />
+    {/* Legs */}
+    <path d="M95,165 Q90,180 82,192 Q88,190 92,185 Q90,192 88,198 Q94,192 98,182Z" fill="#b45309" />
+    <path d="M145,165 Q150,180 158,192 Q152,190 148,185 Q150,192 152,198 Q146,192 142,182Z" fill="#b45309" />
+    {/* Tail */}
+    <path d="M120,168 Q140,180 160,185 Q175,185 185,178 Q180,182 175,180" stroke="#b45309" strokeWidth="6" fill="none" strokeLinecap="round" />
+  </svg>
+);
+
+const MonsterDemon = ({ glow }) => (
+  <svg viewBox="0 0 200 220" width="160" height="175">
+    <defs>
+      <linearGradient id="demonG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#f472b6" />
+        <stop offset="100%" stopColor="#500724" />
+      </linearGradient>
+      <filter id="demonGlow"><feGaussianBlur stdDeviation="3" /><feComposite in="SourceGraphic" /></filter>
+    </defs>
+    <ellipse cx="100" cy="210" rx="40" ry="7" fill="#f472b6" opacity="0.15" />
+    {/* Body */}
+    <path d="M65,110 Q55,90 60,70 Q65,55 80,50 L120,50 Q135,55 140,70 Q145,90 135,110 Q140,140 135,170 L110,175 L100,165 L90,175 L65,170 Q60,140 65,110Z" fill="url(#demonG)" filter="url(#demonGlow)" />
+    {/* Horns - large curved */}
+    <path d="M75,55 Q60,30 45,15 Q55,25 58,35" stroke="#be185d" strokeWidth="6" fill="none" strokeLinecap="round" />
+    <path d="M125,55 Q140,30 155,15 Q145,25 142,35" stroke="#be185d" strokeWidth="6" fill="none" strokeLinecap="round" />
+    {/* Eyes - glowing */}
+    <ellipse cx="85" cy="80" rx="10" ry="7" fill="#fbbf24" />
+    <ellipse cx="115" cy="80" rx="10" ry="7" fill="#fbbf24" />
+    <ellipse cx="86" cy="80" rx="5" ry="6" fill="#dc2626" />
+    <ellipse cx="116" cy="80" rx="5" ry="6" fill="#dc2626" />
+    <circle cx="87" cy="78" r="2" fill="#fbbf24" />
+    <circle cx="117" cy="78" r="2" fill="#fbbf24" />
+    {/* Mouth */}
+    <path d="M78,100 Q100,112 122,100" stroke="#881337" strokeWidth="2.5" fill="none" />
+    <path d="M85,102 L83,110 L88,104" fill="#fff" />
+    <path d="M100,105 L100,112 L103,106" fill="#fff" />
+    <path d="M115,102 L117,110 L112,104" fill="#fff" />
+    {/* Arms */}
+    <path d="M55,90 Q40,100 30,115 Q35,110 40,108 Q35,118 32,128 Q40,118 48,110 L58,100Z" fill="#9d174d" />
+    <path d="M145,90 Q160,100 170,115 Q165,110 160,108 Q165,118 168,128 Q160,118 152,110 L142,100Z" fill="#9d174d" />
+    {/* Wings (small) */}
+    <path d="M55,75 Q35,55 25,40 Q35,52 40,48 Q32,62 30,72 Q40,65 50,68Z" fill="#9d174d" opacity="0.7" />
+    <path d="M145,75 Q165,55 175,40 Q165,52 160,48 Q168,62 170,72 Q160,65 150,68Z" fill="#9d174d" opacity="0.7" />
+    {/* Tail */}
+    <path d="M100,172 Q85,190 75,195 Q65,198 55,192" stroke="#831843" strokeWidth="5" fill="none" strokeLinecap="round" />
+    <path d="M55,192 L48,186 L52,196 L58,190" fill="#be185d" />
+    {/* Abs detail */}
+    <path d="M90,120 L110,120 M88,132 L112,132 M90,144 L110,144" stroke="#881337" strokeWidth="1.5" opacity="0.4" />
+  </svg>
+);
+
+const MonsterLich = ({ glow }) => (
+  <svg viewBox="0 0 200 230" width="155" height="175">
+    <defs>
+      <linearGradient id="lichG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#e9d5ff" />
+        <stop offset="100%" stopColor="#3b0764" />
+      </linearGradient>
+      <filter id="lichGlow"><feGaussianBlur stdDeviation="3" /><feComposite in="SourceGraphic" /></filter>
+    </defs>
+    <ellipse cx="100" cy="220" rx="35" ry="6" fill="#c084fc" opacity="0.15" />
+    {/* Robe */}
+    <path d="M60,100 Q50,140 45,180 L65,195 Q80,185 100,188 Q120,185 135,195 L155,180 Q150,140 140,100Z" fill="url(#lichG)" filter="url(#lichGlow)" />
+    {/* Hood */}
+    <path d="M55,105 Q50,70 65,50 Q80,35 100,32 Q120,35 135,50 Q150,70 145,105 Q130,95 100,92 Q70,95 55,105Z" fill="#581c87" />
+    {/* Skull face */}
+    <ellipse cx="100" cy="78" rx="24" ry="22" fill="#e8ddd0" />
+    {/* Eye sockets */}
+    <ellipse cx="88" cy="73" rx="9" ry="10" fill="#1c0533" />
+    <ellipse cx="112" cy="73" rx="9" ry="10" fill="#1c0533" />
+    {/* Glowing eyes */}
+    <circle cx="88" cy="74" r="4" fill="#c084fc">
+      <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="112" cy="74" r="4" fill="#c084fc">
+      <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
+    </circle>
+    {/* Nose hole */}
+    <path d="M97,82 L100,86 L103,82" fill="#1c0533" />
+    {/* Teeth */}
+    <path d="M85,92 L87,97 L89,92 L91,97 L93,92 L95,97 L97,92 L99,97 L101,92 L103,97 L105,92 L107,97 L109,92 L111,97 L113,92 L115,97" stroke="#d4c8b8" strokeWidth="1.5" fill="none" />
+    {/* Staff */}
+    <rect x="148" y="50" width="5" height="150" rx="2" fill="#6b21a8" />
+    <circle cx="150" cy="45" r="14" fill="none" stroke="#a855f7" strokeWidth="3" />
+    <circle cx="150" cy="45" r="6" fill="#c084fc">
+      <animate attributeName="r" values="5;7;5" dur="1.5s" repeatCount="indefinite" />
+      <animate attributeName="opacity" values="0.7;1;0.7" dur="1.5s" repeatCount="indefinite" />
+    </circle>
+    {/* Floating runes */}
+    <text x="35" y="80" fill="#a855f7" fontSize="14" opacity="0.5" fontFamily="serif">✦</text>
+    <text x="160" y="120" fill="#a855f7" fontSize="12" opacity="0.4" fontFamily="serif">✧</text>
+    <text x="45" y="150" fill="#a855f7" fontSize="10" opacity="0.3" fontFamily="serif">✦</text>
+    {/* Bony hands */}
+    <path d="M60,140 Q48,145 40,150 Q44,148 42,155 Q46,150 50,148 Q48,156 50,160 Q52,154 55,148Z" fill="#e8ddd0" opacity="0.8" />
+  </svg>
+);
+
+const MonsterDarkLord = ({ glow }) => (
+  <svg viewBox="0 0 240 240" width="190" height="190">
+    <defs>
+      <linearGradient id="dlG" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#fca5a5" />
+        <stop offset="40%" stopColor="#dc2626" />
+        <stop offset="100%" stopColor="#450a0a" />
+      </linearGradient>
+      <linearGradient id="dlArmor" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#71717a" />
+        <stop offset="100%" stopColor="#18181b" />
+      </linearGradient>
+      <filter id="dlGlow"><feGaussianBlur stdDeviation="5" /><feComposite in="SourceGraphic" /></filter>
+      <filter id="dlFire"><feGaussianBlur stdDeviation="6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+    </defs>
+    <ellipse cx="120" cy="230" rx="55" ry="8" fill="#ef4444" opacity="0.15" />
+    {/* Cape */}
+    <path d="M50,100 Q35,150 30,210 L80,200 Q100,195 120,198 Q140,195 160,200 L210,210 Q205,150 190,100Z" fill="#450a0a" opacity="0.7" />
+    {/* Armor body */}
+    <path d="M70,105 Q65,85 72,70 L95,60 L120,55 L145,60 L168,70 Q175,85 170,105 Q175,145 170,180 L120,185 L70,180 Q65,145 70,105Z" fill="url(#dlArmor)" filter="url(#dlGlow)" />
+    {/* Armor lines */}
+    <path d="M95,70 L120,65 L145,70 M90,90 L120,85 L150,90 M85,120 L120,115 L155,120" stroke="#52525b" strokeWidth="1" opacity="0.6" fill="none" />
+    {/* Chest emblem */}
+    <circle cx="120" cy="100" r="12" fill="none" stroke="#ef4444" strokeWidth="2" />
+    <circle cx="120" cy="100" r="5" fill="#ef4444">
+      <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite" />
+    </circle>
+    {/* Helmet */}
+    <path d="M80,70 Q75,45 85,30 Q100,18 120,15 Q140,18 155,30 Q165,45 160,70 Q145,60 120,58 Q95,60 80,70Z" fill="#27272a" />
+    {/* Helmet crest */}
+    <path d="M120,15 Q118,5 120,0 Q122,5 120,15" fill="#dc2626" />
+    <path d="M105,25 Q100,12 95,8" stroke="#dc2626" strokeWidth="3" fill="none" strokeLinecap="round" />
+    <path d="M135,25 Q140,12 145,8" stroke="#dc2626" strokeWidth="3" fill="none" strokeLinecap="round" />
+    {/* Visor slit - glowing eyes */}
+    <path d="M92,52 L108,50 L120,52 L132,50 L148,52" stroke="#ef4444" strokeWidth="3" fill="none" filter="url(#dlFire)">
+      <animate attributeName="opacity" values="0.7;1;0.7" dur="1.5s" repeatCount="indefinite" />
+    </path>
+    {/* Sword */}
+    <rect x="175" y="30" width="6" height="120" rx="2" fill="#a1a1aa" transform="rotate(12,178,90)" />
+    <rect x="165" y="145" width="26" height="8" rx="3" fill="#78716c" transform="rotate(12,178,149)" />
+    <rect x="174" y="150" width="8" height="30" rx="3" fill="#57534e" transform="rotate(12,178,165)" />
+    <path d="M175,30 L178,18 L181,30" fill="#e4e4e7" transform="rotate(12,178,24)" />
+    {/* Shoulders */}
+    <ellipse cx="68" cy="80" rx="18" ry="12" fill="#3f3f46" />
+    <path d="M58,74 L52,65 M63,72 L59,62 M68,72 L66,62" stroke="#52525b" strokeWidth="2" strokeLinecap="round" />
+    <ellipse cx="172" cy="80" rx="18" ry="12" fill="#3f3f46" />
+    <path d="M182,74 L188,65 M177,72 L181,62 M172,72 L174,62" stroke="#52525b" strokeWidth="2" strokeLinecap="round" />
+    {/* Dark aura particles */}
+    <circle cx="50" cy="70" r="3" fill="#ef4444" opacity="0.3">
+      <animate attributeName="opacity" values="0;0.4;0" dur="3s" repeatCount="indefinite" />
+      <animate attributeName="cy" values="70;55;70" dur="3s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="190" cy="90" r="2" fill="#ef4444" opacity="0.3">
+      <animate attributeName="opacity" values="0;0.3;0" dur="2.5s" repeatCount="indefinite" />
+      <animate attributeName="cy" values="90;75;90" dur="2.5s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="70" cy="170" r="2.5" fill="#ef4444" opacity="0.2">
+      <animate attributeName="opacity" values="0;0.3;0" dur="3.5s" repeatCount="indefinite" />
+    </circle>
+  </svg>
+);
+
+const MONSTER_SVGS = [MonsterSlime, MonsterBat, MonsterGoblin, MonsterWolf, MonsterDragon, MonsterDemon, MonsterLich, MonsterDarkLord];
+
+/* ═══════════════════════════════════════════
+   WORD DATABASE
+   ═══════════════════════════════════════════ */
+const WORD_SETS = {
+  1: [
+    { en: "cat", ja: "ねこ", visual: "🐱" },{ en: "dog", ja: "いぬ", visual: "🐶" },{ en: "sun", ja: "たいよう", visual: "☀️" },
+    { en: "red", ja: "あか", visual: "🔴" },{ en: "cup", ja: "カップ", visual: "☕" },{ en: "pen", ja: "ペン", visual: "🖊️" },
+    { en: "egg", ja: "たまご", visual: "🥚" },{ en: "hat", ja: "ぼうし", visual: "🎩" },{ en: "box", ja: "はこ", visual: "📦" },
+    { en: "bus", ja: "バス", visual: "🚌" },{ en: "bed", ja: "ベッド", visual: "🛏️" },{ en: "run", ja: "はしる", visual: "🏃" },
+    { en: "big", ja: "おおきい", visual: "🦣" },{ en: "hot", ja: "あつい", visual: "🔥" },{ en: "map", ja: "ちず", visual: "🗺️" },
+    { en: "ice", ja: "こおり", visual: "🧊" },{ en: "eye", ja: "め", visual: "👁️" },{ en: "ear", ja: "みみ", visual: "👂" },
+  ],
+  2: [
+    { en: "fish", ja: "さかな", visual: "🐟" },{ en: "bird", ja: "とり", visual: "🐦" },{ en: "cake", ja: "ケーキ", visual: "🎂" },
+    { en: "book", ja: "ほん", visual: "📖" },{ en: "tree", ja: "き", visual: "🌳" },{ en: "star", ja: "ほし", visual: "⭐" },
+    { en: "milk", ja: "ぎゅうにゅう", visual: "🥛" },{ en: "rain", ja: "あめ", visual: "🌧️" },{ en: "blue", ja: "あお", visual: "🔵" },
+    { en: "ball", ja: "ボール", visual: "⚽" },{ en: "door", ja: "ドア", visual: "🚪" },{ en: "hand", ja: "て", visual: "✋" },
+    { en: "king", ja: "おうさま", visual: "👑" },{ en: "jump", ja: "とぶ", visual: "🦘" },{ en: "play", ja: "あそぶ", visual: "🎮" },
+    { en: "moon", ja: "つき", visual: "🌙" },{ en: "swim", ja: "およぐ", visual: "🏊" },{ en: "sing", ja: "うたう", visual: "🎤" },
+  ],
+  3: [
+    { en: "apple", ja: "りんご", visual: "🍎" },{ en: "water", ja: "みず", visual: "💧" },{ en: "happy", ja: "うれしい", visual: "😄" },
+    { en: "house", ja: "いえ", visual: "🏠" },{ en: "music", ja: "おんがく", visual: "🎵" },{ en: "green", ja: "みどり", visual: "🟢" },
+    { en: "tiger", ja: "とら", visual: "🐯" },{ en: "smile", ja: "えがお", visual: "😊" },{ en: "river", ja: "かわ", visual: "🏞️" },
+    { en: "candy", ja: "あめ", visual: "🍬" },{ en: "cloud", ja: "くも", visual: "☁️" },{ en: "dance", ja: "おどる", visual: "💃" },
+    { en: "lemon", ja: "レモン", visual: "🍋" },{ en: "knife", ja: "ナイフ", visual: "🔪" },{ en: "chair", ja: "いす", visual: "🪑" },
+    { en: "earth", ja: "ちきゅう", visual: "🌍" },{ en: "heart", ja: "こころ", visual: "❤️" },{ en: "piano", ja: "ピアノ", visual: "🎹" },
+  ],
+  4: [
+    { en: "school", ja: "がっこう", visual: "🏫" },{ en: "friend", ja: "ともだち", visual: "🤝" },{ en: "orange", ja: "オレンジ", visual: "🍊" },
+    { en: "dinner", ja: "ゆうしょく", visual: "🍽️" },{ en: "flower", ja: "はな", visual: "🌸" },{ en: "animal", ja: "どうぶつ", visual: "🦁" },
+    { en: "spring", ja: "はる", visual: "🌷" },{ en: "summer", ja: "なつ", visual: "🌻" },{ en: "winter", ja: "ふゆ", visual: "❄️" },
+    { en: "rocket", ja: "ロケット", visual: "🚀" },{ en: "player", ja: "せんしゅ", visual: "⚾" },{ en: "garden", ja: "にわ", visual: "🌺" },
+    { en: "monkey", ja: "さる", visual: "🐒" },{ en: "island", ja: "しま", visual: "🏝️" },{ en: "strong", ja: "つよい", visual: "💪" },
+    { en: "puzzle", ja: "パズル", visual: "🧩" },{ en: "camera", ja: "カメラ", visual: "📷" },{ en: "dragon", ja: "ドラゴン", visual: "🐲" },
+  ],
+  5: [
+    { en: "kitchen", ja: "だいどころ", visual: "🍳" },{ en: "teacher", ja: "せんせい", visual: "👩‍🏫" },{ en: "morning", ja: "あさ", visual: "🌅" },
+    { en: "bicycle", ja: "じてんしゃ", visual: "🚲" },{ en: "rainbow", ja: "にじ", visual: "🌈" },{ en: "brother", ja: "きょうだい", visual: "👦" },
+    { en: "library", ja: "としょかん", visual: "📚" },{ en: "picture", ja: "え", visual: "🖼️" },{ en: "chicken", ja: "にわとり", visual: "🐔" },
+    { en: "monster", ja: "かいぶつ", visual: "👾" },{ en: "excited", ja: "わくわく", visual: "🤩" },{ en: "village", ja: "むら", visual: "🏘️" },
+    { en: "stadium", ja: "きょうぎじょう", visual: "🏟️" },{ en: "captain", ja: "キャプテン", visual: "🫡" },{ en: "penguin", ja: "ペンギン", visual: "🐧" },
+    { en: "thunder", ja: "かみなり", visual: "⚡" },{ en: "diamond", ja: "ダイヤモンド", visual: "💎" },
+  ],
+  6: [
+    { en: "baseball", ja: "やきゅう", visual: "⚾" },{ en: "elephant", ja: "ぞう", visual: "🐘" },{ en: "sandwich", ja: "サンドイッチ", visual: "🥪" },
+    { en: "tomorrow", ja: "あした", visual: "📅" },{ en: "birthday", ja: "たんじょうび", visual: "🎂" },{ en: "homework", ja: "しゅくだい", visual: "📝" },
+    { en: "treasure", ja: "たからもの", visual: "💰" },{ en: "dinosaur", ja: "きょうりゅう", visual: "🦕" },{ en: "champion", ja: "チャンピオン", visual: "🏆" },
+    { en: "festival", ja: "おまつり", visual: "🎆" },{ en: "mountain", ja: "やま", visual: "🏔️" },{ en: "question", ja: "しつもん", visual: "❓" },
+    { en: "thousand", ja: "せん", visual: "💫" },{ en: "together", ja: "いっしょに", visual: "👫" },{ en: "umbrella", ja: "かさ", visual: "☂️" },
+    { en: "goldfish", ja: "きんぎょ", visual: "🐠" },
+  ],
+};
+
+/* ═══════════════════════════════════════════
+   MONSTERS META
+   ═══════════════════════════════════════════ */
+const MONSTERS = [
+  { name: "スライム", idx: 0, glow: "#22c55e", maxHp: 30, xp: 15, bg: "radial-gradient(ellipse at 50% 80%, #064e3b 0%, #022c22 60%, #000 100%)" },
+  { name: "コウモリ", idx: 1, glow: "#a78bfa", maxHp: 50, xp: 25, bg: "radial-gradient(ellipse at 50% 80%, #2e1065 0%, #1e1b4b 60%, #000 100%)" },
+  { name: "ゴブリン", idx: 2, glow: "#f87171", maxHp: 70, xp: 35, bg: "radial-gradient(ellipse at 50% 80%, #3d1a0a 0%, #1c0a04 60%, #000 100%)" },
+  { name: "オオカミ", idx: 3, glow: "#60a5fa", maxHp: 90, xp: 45, bg: "radial-gradient(ellipse at 50% 80%, #1e3a5f 0%, #0c1929 60%, #000 100%)" },
+  { name: "ドラゴン", idx: 4, glow: "#fbbf24", maxHp: 120, xp: 60, bg: "radial-gradient(ellipse at 50% 80%, #78350f 0%, #451a03 60%, #000 100%)" },
+  { name: "デーモン", idx: 5, glow: "#f472b6", maxHp: 150, xp: 80, bg: "radial-gradient(ellipse at 50% 80%, #831843 0%, #500724 60%, #000 100%)" },
+  { name: "リッチ", idx: 6, glow: "#c084fc", maxHp: 180, xp: 100, bg: "radial-gradient(ellipse at 50% 80%, #3b0764 0%, #1a0533 60%, #000 100%)" },
+  { name: "魔王", idx: 7, glow: "#ef4444", maxHp: 250, xp: 150, bg: "radial-gradient(ellipse at 50% 80%, #991b1b 0%, #300808 60%, #000 100%)" },
+];
+
+/* ═══════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════ */
+// ── Smart voice selection: prefer Enhanced/Premium native voices ──
+let _voiceCache = {};
+const getVoices = () => window.speechSynthesis?.getVoices() || [];
+
+const pickBestVoice = (lang) => {
+  if (_voiceCache[lang]) return _voiceCache[lang];
+  const voices = getVoices();
+  if (!voices.length) return null;
+  const langPrefix = lang.split("-")[0]; // "en" or "ja"
+  const candidates = voices.filter(v => v.lang.startsWith(langPrefix));
+  // Priority: Enhanced/Premium > local quality > any match
+  const premium = candidates.find(v => /enhanced|premium/i.test(v.name));
+  if (premium) { _voiceCache[lang] = premium; return premium; }
+  // On iPad/iOS, prefer Samantha or Karen (en), O-Ren or Kyoko (ja)
+  const preferred = lang === "en-US"
+    ? ["samantha","karen","daniel","moira","tessa","rishi","ava","zoe","nicky"]
+    : ["o-ren","kyoko","otoya","hattori"];
+  const named = candidates.find(v => preferred.some(n => v.name.toLowerCase().includes(n)));
+  if (named) { _voiceCache[lang] = named; return named; }
+  // Fallback: any localService voice (higher quality than remote)
+  const local = candidates.find(v => v.localService);
+  if (local) { _voiceCache[lang] = local; return local; }
+  const any = candidates[0] || null;
+  _voiceCache[lang] = any;
+  return any;
+};
+
+// Pre-load voices (some browsers load async)
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => { _voiceCache = {}; };
+}
+
+const speak = (text, lang, rate = 1) => {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = lang;
+  const voice = pickBestVoice(lang);
+  if (voice) u.voice = voice;
+  // Natural pacing: slightly slower for learning, natural pitch
+  u.rate = lang === "en-US" ? Math.min(rate, 0.88) : rate;
+  u.pitch = lang === "en-US" ? 1.0 : 1.05;
+  // Small pause before speaking feels more natural
+  u.volume = 1;
+  window.speechSynthesis.speak(u);
+};
+
+const Particles = ({ color = "#fff" }) => {
+  const pts = useMemo(() => Array.from({ length: 30 }, (_, i) => ({
+    id: i, x: Math.random()*100, y: Math.random()*100, size: Math.random()*2.5+0.5,
+    dur: Math.random()*8+6, delay: Math.random()*-10, opacity: Math.random()*0.3+0.1,
+  })), []);
+  return (
+    <div style={{ position:"absolute",inset:0,overflow:"hidden",pointerEvents:"none",zIndex:0 }}>
+      {pts.map(p=>(
+        <div key={p.id} style={{
+          position:"absolute",left:`${p.x}%`,top:`${p.y}%`,width:p.size,height:p.size,
+          borderRadius:"50%",background:color,opacity:p.opacity,
+          animation:`particleDrift ${p.dur}s linear infinite`,animationDelay:`${p.delay}s`,
+        }}/>
+      ))}
+    </div>
+  );
+};
+
+const OrnateFrame = ({ children, style={} }) => (
+  <div style={{ position:"relative",padding:2,borderRadius:14,
+    background:"linear-gradient(135deg, rgba(251,191,36,0.35), rgba(251,191,36,0.03), rgba(251,191,36,0.25))",...style }}>
+    <div style={{ background:"rgba(0,0,0,0.75)",backdropFilter:"blur(20px)",borderRadius:12,padding:16,position:"relative" }}>
+      {[0,1,2,3].map(i=>(
+        <div key={i} style={{
+          position:"absolute",fontSize:7,color:"rgba(251,191,36,0.4)",
+          top:i<2?4:undefined,bottom:i>=2?4:undefined,left:i%2===0?8:undefined,right:i%2===1?8:undefined,
+        }}>◆</div>
+      ))}
+      {children}
+    </div>
+  </div>
+);
+
+/* ═══════════════════════════════════════════
+   MAIN APP
+   ═══════════════════════════════════════════ */
+function WordSlayer() {
+  const [screen, setScreen] = useState("title");
+  const [playerLevel, setPlayerLevel] = useState(1);
+  const [playerXp, setPlayerXp] = useState(0);
+  const [xpToNext, setXpToNext] = useState(25);
+  const [totalDefeated, setTotalDefeated] = useState(0);
+  const [totalWords, setTotalWords] = useState(0);
+  const [playerMaxHp, setPlayerMaxHp] = useState(50);
+  const [playerHp, setPlayerHp] = useState(50);
+  const [gameOver, setGameOver] = useState(false);
+  const [playerDamageFlash, setPlayerDamageFlash] = useState(false);
+  const [monster, setMonster] = useState(null);
+  const [monsterHp, setMonsterHp] = useState(0);
+  const [currentWord, setCurrentWord] = useState(null);
+  const [typed, setTyped] = useState("");
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [shakeMonster, setShakeMonster] = useState(false);
+  const [hitEffect, setHitEffect] = useState(false);
+  const [defeatAnim, setDefeatAnim] = useState(false);
+  const [battleLog, setBattleLog] = useState([]);
+  const [showResult, setShowResult] = useState(false);
+  const [wordsThisBattle, setWordsThisBattle] = useState(0);
+  const [mistakesThisBattle, setMistakesThisBattle] = useState(0);
+  const [levelUpShow, setLevelUpShow] = useState(false);
+  const [damageNum, setDamageNum] = useState(null);
+  const [visualPop, setVisualPop] = useState(false);
+  const [titleReady, setTitleReady] = useState(false);
+  const usedWords = useRef(new Set());
+
+  useEffect(() => { setTimeout(() => setTitleReady(true), 100); }, []);
+
+  const getWordStage = (l) => Math.min(Math.max(Math.ceil(l/2),1),6);
+
+  const pickWord = useCallback((stage) => {
+    const pool = [];
+    for (let s=Math.max(1,stage-1);s<=Math.min(6,stage);s++) pool.push(...(WORD_SETS[s]||[]));
+    const avail=pool.filter(w=>!usedWords.current.has(w.en));
+    const list=avail.length>0?avail:pool;
+    const word=list[Math.floor(Math.random()*list.length)];
+    usedWords.current.add(word.en);
+    if(usedWords.current.size>50) usedWords.current.clear();
+    return word;
+  },[]);
+
+  const pickMonster = useCallback((lvl) => {
+    // Show variety early: pool widens with level, but always has range
+    const minIdx = Math.max(0, Math.floor((lvl - 1) / 2) - 1);
+    const maxIdx = Math.min(MONSTERS.length - 1, Math.floor((lvl - 1) / 2) + 1);
+    const idx = minIdx + Math.floor(Math.random() * (maxIdx - minIdx + 1));
+    const base = MONSTERS[idx];
+    const scale = 1 + (lvl - 1) * 0.12;
+    return { ...base, maxHp: Math.floor(base.maxHp * scale) };
+  }, []);
+
+  const startBattle = useCallback(()=>{
+    const m=pickMonster(playerLevel);
+    const hp = 50 + (playerLevel - 1) * 10; // Lv1=50, Lv2=60, etc.
+    setPlayerMaxHp(hp); setPlayerHp(hp);
+    setMonster(m);setMonsterHp(m.maxHp);
+    setCurrentWord(pickWord(getWordStage(playerLevel)));
+    setTyped("");setCombo(0);setMaxCombo(0);
+    setWordsThisBattle(0);setMistakesThisBattle(0);
+    setBattleLog([]);setShowResult(false);setDefeatAnim(false);
+    setVisualPop(false);setGameOver(false);setScreen("battle");
+  },[playerLevel,pickMonster,pickWord]);
+
+  useEffect(()=>{
+    if(currentWord&&screen==="battle"&&!gameOver){
+      setVisualPop(true);setTimeout(()=>setVisualPop(false),600);
+      // English first, then Japanese after English finishes
+      setTimeout(()=>{
+        if(!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const uEn = new SpeechSynthesisUtterance(currentWord.en);
+        uEn.lang = "en-US";
+        const enVoice = pickBestVoice("en-US");
+        if(enVoice) uEn.voice = enVoice;
+        uEn.rate = 0.82; uEn.pitch = 1.0;
+        uEn.onend = () => {
+          // Small pause then Japanese
+          setTimeout(()=>{
+            const uJa = new SpeechSynthesisUtterance(currentWord.ja);
+            uJa.lang = "ja-JP";
+            const jaVoice = pickBestVoice("ja-JP");
+            if(jaVoice) uJa.voice = jaVoice;
+            uJa.rate = 0.95; uJa.pitch = 1.05;
+            window.speechSynthesis.speak(uJa);
+          }, 300);
+        };
+        window.speechSynthesis.speak(uEn);
+      }, 300);
+    }
+  },[currentWord,screen,gameOver]);
+
+  // Keyboard handler
+  useEffect(()=>{
+    const handleKeyDown=(e)=>{
+      if(screen!=="battle"||!currentWord||showResult||defeatAnim||gameOver) return;
+      const key=e.key.toLowerCase();
+      if(key.length!==1||!/[a-z]/.test(key)) return;
+      e.preventDefault();
+      const target=currentWord.en.toLowerCase();
+      const nextChar=target[typed.length];
+      if(key===nextChar){
+        const newTyped=typed+key;
+        setTyped(newTyped);
+        if(newTyped===target){
+          const nc=combo+1;
+          setCombo(nc);if(nc>maxCombo) setMaxCombo(nc);
+          setWordsThisBattle(p=>p+1);setTotalWords(p=>p+1);
+          const dmg=Math.floor((currentWord.en.length||3)*2*(1+nc*0.15));
+          setDamageNum(dmg);setTimeout(()=>setDamageNum(null),900);
+          // Say Japanese on completion (reinforcement)
+          setTimeout(()=>speak(currentWord.ja,"ja-JP",0.95),150);
+          setShakeMonster(true);setHitEffect(true);
+          setTimeout(()=>{setShakeMonster(false);setHitEffect(false);},400);
+          setBattleLog(prev=>[...prev.slice(-6),{en:currentWord.en,ja:currentWord.ja,visual:currentWord.visual,dmg,combo:nc}]);
+          const newHp=Math.max(0,monsterHp-dmg);
+          setMonsterHp(newHp);
+          if(newHp<=0){
+            setDefeatAnim(true);setTotalDefeated(p=>p+1);
+            const earned=monster.xp+Math.floor(maxCombo*3);
+            const nx=playerXp+earned;
+            if(nx>=xpToNext){
+              setPlayerLevel(l=>l+1);setPlayerXp(nx-xpToNext);
+              setXpToNext(x=>Math.floor(x*1.25));
+              setLevelUpShow(true);setTimeout(()=>setLevelUpShow(false),2200);
+            } else setPlayerXp(nx);
+            setTimeout(()=>setShowResult(true),1300);
+          } else {
+            setCurrentWord(pickWord(getWordStage(playerLevel)));
+            setTyped("");
+          }
+        }
+      } else {
+        // MISS — player takes damage
+        setMistakesThisBattle(p=>p+1);setCombo(0);
+        // Damage scales with word stage (harder words = more damage on miss)
+        const wordStage = getWordStage(playerLevel);
+        const missDmg = 3 + wordStage * 2; // Lv1=5, Lv3=7, Lv5+=9+
+        setPlayerHp(prev => {
+          const newHp = Math.max(0, prev - missDmg);
+          if(newHp <= 0){
+            // Game Over
+            setTimeout(()=>setGameOver(true), 400);
+          }
+          return newHp;
+        });
+        setPlayerDamageFlash(true);
+        setTimeout(()=>setPlayerDamageFlash(false), 300);
+      }
+    };
+    window.addEventListener("keydown",handleKeyDown);
+    return ()=>window.removeEventListener("keydown",handleKeyDown);
+  },[screen,currentWord,typed,combo,maxCombo,monsterHp,monster,playerXp,xpToNext,playerLevel,showResult,defeatAnim,gameOver,pickWord]);
+
+  const replaySound = useCallback(()=>{
+    if(!currentWord || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const uEn = new SpeechSynthesisUtterance(currentWord.en);
+    uEn.lang = "en-US";
+    const enV = pickBestVoice("en-US"); if(enV) uEn.voice = enV;
+    uEn.rate = 0.78; uEn.pitch = 1.0;
+    uEn.onend = ()=>{
+      setTimeout(()=>{
+        const uJa = new SpeechSynthesisUtterance(currentWord.ja);
+        uJa.lang = "ja-JP";
+        const jaV = pickBestVoice("ja-JP"); if(jaV) uJa.voice = jaV;
+        uJa.rate = 0.95; uJa.pitch = 1.05;
+        window.speechSynthesis.speak(uJa);
+      }, 300);
+    };
+    window.speechSynthesis.speak(uEn);
+  },[currentWord]);
+
+  const fontLink="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap";
+  const ff="'Cinzel Decorative',serif";
+  const ffJa="'Noto Sans JP',sans-serif";
+
+  const CSS=`
+    @import url('${fontLink}');
+    @keyframes particleDrift{0%{transform:translateY(0) translateX(0);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(-120px) translateX(30px);opacity:0}}
+    @keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-14px) rotate(-3deg)}30%{transform:translateX(12px) rotate(3deg)}45%{transform:translateX(-10px)}60%{transform:translateX(8px)}80%{transform:translateX(-4px)}}
+    @keyframes monsterIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+    @keyframes monsterIntro{0%{transform:scale(0) rotate(-10deg);opacity:0}60%{transform:scale(1.1) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:1}}
+    @keyframes defeat{0%{opacity:1;transform:scale(1);filter:brightness(1)}30%{filter:brightness(3);transform:scale(1.3)}100%{opacity:0;transform:scale(0) rotate(40deg);filter:brightness(0)}}
+    @keyframes hitBurst{0%{transform:scale(0.3);opacity:1}100%{transform:scale(2.5);opacity:0}}
+    @keyframes damageFloat{0%{transform:translateY(0) scale(1);opacity:1}100%{transform:translateY(-60px) scale(1.3);opacity:0}}
+    @keyframes fadeIn{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
+    @keyframes levelUp{0%{transform:translateY(0) scale(0.8);opacity:0}20%{transform:translateY(-20px) scale(1.2);opacity:1}80%{opacity:1}100%{transform:translateY(-80px) scale(1);opacity:0}}
+    @keyframes visualPop{0%{transform:scale(0) rotate(-20deg);opacity:0}50%{transform:scale(1.3) rotate(5deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:1}}
+    @keyframes glowPulse{0%,100%{box-shadow:0 0 15px var(--glow)}50%{box-shadow:0 0 30px var(--glow),0 0 60px var(--glow2)}}
+    @keyframes titleSlide{0%{transform:translateY(30px);opacity:0}100%{transform:translateY(0);opacity:1}}
+    @keyframes swordSpin{0%,100%{transform:rotate(-5deg) scale(1)}25%{transform:rotate(5deg) scale(1.05)}50%{transform:rotate(-3deg) scale(1.1)}75%{transform:rotate(3deg) scale(1.02)}}
+    @keyframes comboFire{0%,100%{text-shadow:0 0 10px #f59e0b,0 0 20px #ef4444}50%{text-shadow:0 0 20px #f59e0b,0 0 40px #ef4444,0 0 60px #fbbf24}}
+    @keyframes visualBob{0%,100%{transform:translateY(0) rotate(0)}33%{transform:translateY(-8px) rotate(3deg)}66%{transform:translateY(2px) rotate(-2deg)}}
+    @keyframes gameOverPulse{0%,100%{text-shadow:0 0 20px #ef4444,0 0 40px #991b1b}50%{text-shadow:0 0 40px #ef4444,0 0 80px #991b1b,0 0 120px #450a0a}}
+    @keyframes screenShake{0%,100%{transform:translate(0)}10%{transform:translate(-4px,-2px)}20%{transform:translate(4px,2px)}30%{transform:translate(-2px,4px)}40%{transform:translate(2px,-4px)}50%{transform:translate(-4px,2px)}60%{transform:translate(4px,-2px)}70%{transform:translate(-2px,-4px)}80%{transform:translate(2px,4px)}90%{transform:translate(-4px,-2px)}}
+  `;
+
+  const MonsterSVG = monster ? MONSTER_SVGS[monster.idx] : null;
+
+  // ─── TITLE ───
+  if(screen==="title"){
+    return (
+      <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+        background:"radial-gradient(ellipse at 50% 30%, #1a1040 0%, #0a0a1a 50%, #000 100%)",
+        fontFamily:ffJa,color:"#fff",position:"relative",overflow:"hidden"}}>
+        <style>{CSS}</style>
+        <Particles color="rgba(251,191,36,0.6)"/>
+        {[400,500].map(s=>(<div key={s} style={{position:"absolute",width:s,height:s,borderRadius:"50%",
+          border:`1px solid rgba(251,191,36,${s===400?0.08:0.04})`,top:"50%",left:"50%",transform:"translate(-50%,-50%)"}}/>))}
+        <div style={{position:"relative",zIndex:2,display:"flex",flexDirection:"column",alignItems:"center",
+          opacity:titleReady?1:0,transition:"opacity 0.6s"}}>
+          <div style={{fontSize:72,marginBottom:4,filter:"drop-shadow(0 0 25px rgba(251,191,36,0.5))",
+            animation:"swordSpin 4s ease-in-out infinite"}}>⚔️</div>
+          <h1 style={{fontFamily:ff,fontSize:48,fontWeight:900,margin:"0 0 4px",
+            background:"linear-gradient(180deg, #fde68a 0%, #f59e0b 40%, #b45309 100%)",
+            WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
+            letterSpacing:6,animation:"titleSlide 0.8s ease-out both"}}>WORD SLAYER</h1>
+          <p style={{fontSize:13,color:"rgba(251,191,36,0.6)",marginBottom:40,letterSpacing:8,fontWeight:700,
+            animation:"titleSlide 0.8s ease-out 0.2s both"}}>英 単 語 タ イ ピ ン グ バ ト ル</p>
+          <OrnateFrame style={{marginBottom:28,animation:"titleSlide 0.8s ease-out 0.3s both"}}>
+            <div style={{display:"flex",gap:24,fontSize:13,color:"#d4d4d8"}}>
+              <span><span style={{color:"#a78bfa"}}>⚡</span> Lv.{playerLevel}</span>
+              <span><span style={{color:"#ef4444"}}>🏆</span> {totalDefeated}体</span>
+              <span><span style={{color:"#4ade80"}}>📝</span> {totalWords}語</span>
+            </div>
+          </OrnateFrame>
+          <button onClick={startBattle} style={{fontFamily:ff,padding:"18px 56px",fontSize:20,fontWeight:900,
+            background:"linear-gradient(180deg, #f59e0b 0%, #b45309 100%)",
+            border:"2px solid rgba(253,230,138,0.5)",borderRadius:12,color:"#fff",cursor:"pointer",letterSpacing:4,
+            boxShadow:"0 0 40px rgba(245,158,11,0.3), inset 0 1px 0 rgba(255,255,255,0.2)",
+            transition:"all 0.2s",animation:"titleSlide 0.8s ease-out 0.4s both"}}
+            onMouseEnter={e=>{e.currentTarget.style.transform="scale(1.06)";e.currentTarget.style.boxShadow="0 0 60px rgba(245,158,11,0.5), inset 0 1px 0 rgba(255,255,255,0.3)";}}
+            onMouseLeave={e=>{e.currentTarget.style.transform="scale(1)";e.currentTarget.style.boxShadow="0 0 40px rgba(245,158,11,0.3), inset 0 1px 0 rgba(255,255,255,0.2)";}}>
+            BATTLE</button>
+          <p style={{fontSize:11,color:"#52525b",marginTop:28,letterSpacing:1,
+            animation:"titleSlide 0.8s ease-out 0.5s both"}}>外付けキーボードで英単語をタイプしてモンスターを倒せ</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── BATTLE ───
+  const hpPct=monster?(monsterHp/monster.maxHp)*100:0;
+  const hpColor=hpPct>50?"#4ade80":hpPct>20?"#fbbf24":"#ef4444";
+  const xpPct=(playerXp/xpToNext)*100;
+  const target=currentWord?.en?.toLowerCase()||"";
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",
+      background:monster?.bg||"#000",fontFamily:ffJa,color:"#fff",
+      position:"relative",overflow:"hidden",transition:"background 1s"}}>
+      <style>{CSS}</style>
+      <Particles color={monster?.glow||"#fff"}/>
+
+      {/* Player damage vignette */}
+      {playerDamageFlash && (
+        <div style={{position:"absolute",inset:0,zIndex:4,pointerEvents:"none",
+          boxShadow:"inset 0 0 80px rgba(239,68,68,0.5), inset 0 0 150px rgba(239,68,68,0.2)",
+          transition:"opacity 0.15s"}} />
+      )}
+
+      {/* HUD */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 20px",
+        background:"linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%)",position:"relative",zIndex:5,
+        ...(playerDamageFlash ? {boxShadow:"inset 0 0 40px rgba(239,68,68,0.4)"} : {}),
+        transition:"box-shadow 0.15s"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <div style={{background:"linear-gradient(135deg, #6366f1, #4f46e5)",borderRadius:10,
+            width:42,height:42,display:"flex",alignItems:"center",justifyContent:"center",
+            fontSize:13,fontWeight:900,fontFamily:ff,border:"1px solid rgba(165,180,252,0.3)",
+            boxShadow:"0 0 15px rgba(99,102,241,0.3)"}}>{playerLevel}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:4}}>
+            <div>
+              <div style={{fontSize:10,color:"#f87171",marginBottom:2,letterSpacing:2,
+                display:"flex",justifyContent:"space-between"}}>
+                <span>HP</span><span style={{color:"#a1a1aa",letterSpacing:0}}>{playerHp}/{playerMaxHp}</span>
+              </div>
+              <div style={{width:100,height:8,background:"rgba(255,255,255,0.08)",borderRadius:4,overflow:"hidden",
+                border:"1px solid rgba(255,255,255,0.06)"}}>
+                <div style={{width:`${(playerHp/playerMaxHp)*100}%`,height:"100%",
+                  background: playerHp/playerMaxHp > 0.5 ? "linear-gradient(90deg, #4ade80, #22c55e)"
+                    : playerHp/playerMaxHp > 0.2 ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
+                    : "linear-gradient(90deg, #ef4444, #dc2626)",
+                  borderRadius:4,transition:"width 0.3s ease"}}/>
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:10,color:"#a5b4fc",marginBottom:2,letterSpacing:2}}>EXP</div>
+              <div style={{width:100,height:5,background:"rgba(255,255,255,0.08)",borderRadius:3,overflow:"hidden",
+                border:"1px solid rgba(255,255,255,0.06)"}}>
+                <div style={{width:`${xpPct}%`,height:"100%",background:"linear-gradient(90deg, #6366f1, #a78bfa)",
+                  borderRadius:3,transition:"width 0.6s ease"}}/>
+              </div>
+            </div>
+          </div>
+        </div>
+        {combo>=2&&(<div style={{fontFamily:ff,fontSize:18,fontWeight:900,color:"#fbbf24",
+          animation:"comboFire 1s ease-in-out infinite",letterSpacing:2}}>{combo} COMBO</div>)}
+        <div style={{fontSize:12,color:"#94a3b8"}}>⚔️ {wordsThisBattle}語</div>
+      </div>
+
+      {/* Level Up */}
+      {levelUpShow&&(<div style={{position:"absolute",top:"18%",left:"50%",transform:"translateX(-50%)",
+        zIndex:20,textAlign:"center",animation:"levelUp 2.2s ease-out forwards"}}>
+        <div style={{fontFamily:ff,fontSize:36,fontWeight:900,color:"#fbbf24",
+          textShadow:"0 0 30px rgba(251,191,36,0.6), 0 0 60px rgba(251,191,36,0.3)"}}>LEVEL UP!</div>
+        <div style={{fontSize:16,color:"#fde68a",marginTop:4}}>Lv.{playerLevel}</div>
+      </div>)}
+
+      {/* Monster Stage */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+        position:"relative",zIndex:2,minHeight:260}}>
+        {monster&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",
+            animation:defeatAnim?"defeat 1.2s ease-out forwards":"monsterIntro 0.6s ease-out"}}>
+            <div style={{fontSize:14,fontWeight:900,color:monster.glow,letterSpacing:3,marginBottom:8,
+              textShadow:`0 0 15px ${monster.glow}40`}}>{monster.name}</div>
+            <div style={{width:240,marginBottom:16}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#94a3b8",marginBottom:3,
+                letterSpacing:1,padding:"0 2px"}}><span>HP</span><span>{monsterHp} / {monster.maxHp}</span></div>
+              <div style={{height:10,background:"rgba(0,0,0,0.5)",borderRadius:5,overflow:"hidden",
+                border:`1px solid ${monster.glow}30`,"--glow":`${monster.glow}30`,"--glow2":`${monster.glow}10`,
+                animation:"glowPulse 3s ease-in-out infinite"}}>
+                <div style={{width:`${hpPct}%`,height:"100%",
+                  background:`linear-gradient(90deg, ${hpColor}, ${hpColor}cc)`,
+                  borderRadius:5,transition:"width 0.35s ease",boxShadow:`0 0 8px ${hpColor}60`}}/>
+              </div>
+            </div>
+
+            {/* Monster + Visual */}
+            <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {currentWord&&!defeatAnim&&(
+                <div style={{position:"absolute",left:-95,top:"50%",transform:"translateY(-50%)",
+                  display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                  <div style={{fontSize:56,lineHeight:1,
+                    animation:visualPop?"visualPop 0.5s ease-out":"visualBob 3s ease-in-out infinite",
+                    filter:`drop-shadow(0 0 15px ${monster.glow}50)`}}>{currentWord.visual}</div>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.45)",
+                    background:"rgba(0,0,0,0.4)",padding:"2px 8px",borderRadius:4,
+                    backdropFilter:"blur(4px)"}}>{currentWord.ja}</div>
+                </div>
+              )}
+              <div style={{
+                filter:`drop-shadow(0 0 30px ${monster.glow}40)`,
+                animation:shakeMonster?"shake 0.35s":"monsterIdle 3s ease-in-out infinite",
+              }}>
+                {MonsterSVG && <MonsterSVG glow={monster.glow}/>}
+              </div>
+              {damageNum&&(<div style={{position:"absolute",top:-10,right:-30,
+                fontFamily:ff,fontSize:30,fontWeight:900,color:"#fbbf24",
+                textShadow:"0 0 15px rgba(251,191,36,0.6), 2px 2px 0 #000",
+                animation:"damageFloat 0.9s ease-out forwards"}}>-{damageNum}</div>)}
+              {hitEffect&&(<div style={{position:"absolute",fontSize:70,
+                animation:"hitBurst 0.4s ease-out forwards",pointerEvents:"none"}}>💥</div>)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Word Input */}
+      {!showResult&&!gameOver&&currentWord&&(
+        <div style={{padding:"20px 20px 28px",
+          background:"linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 70%, transparent 100%)",
+          display:"flex",flexDirection:"column",alignItems:"center",position:"relative",zIndex:5}}>
+          <div style={{display:"flex",gap:4,marginBottom:14}}>
+            {target.split("").map((ch,i)=>{
+              const done=i<typed.length;const active=i===typed.length;
+              return (<div key={i} style={{
+                width:42,height:54,display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:28,fontFamily:ff,fontWeight:900,borderRadius:8,textTransform:"uppercase",
+                color:done?"#000":active?"#fde68a":"#52525b",
+                background:done?"linear-gradient(180deg, #4ade80, #16a34a)":active?"rgba(251,191,36,0.12)":"rgba(255,255,255,0.03)",
+                border:done?"1px solid #4ade80":active?"1px solid rgba(251,191,36,0.35)":"1px solid rgba(255,255,255,0.05)",
+                boxShadow:done?"0 0 14px rgba(74,222,128,0.35), inset 0 1px 0 rgba(255,255,255,0.3)":active?"0 0 12px rgba(251,191,36,0.12)":"none",
+                transition:"all 0.12s",
+              }}>{ch}</div>);
+            })}
+          </div>
+          <button onClick={e=>{e.stopPropagation();replaySound();}} style={{
+            background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.08)",
+            borderRadius:8,padding:"5px 16px",color:"#71717a",cursor:"pointer",fontSize:12,marginBottom:8,
+            display:"flex",alignItems:"center",gap:6,transition:"all 0.15s"}}
+            onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.1)"}
+            onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.05)"}>
+            🔊 もういちど聞く</button>
+          {combo>=3&&(<div style={{fontSize:12,color:"#f59e0b",fontWeight:700,marginBottom:4,
+            animation:"comboFire 1s ease-in-out infinite"}}>🔥 ダメージ {Math.floor(combo*15)}% UP!</div>)}
+          {battleLog.length>0&&(
+            <div style={{marginTop:8,display:"flex",gap:5,flexWrap:"wrap",justifyContent:"center",maxWidth:450}}>
+              {battleLog.slice(-5).map((l,i)=>(
+                <span key={i} style={{fontSize:10,color:"#a1a1aa",background:"rgba(255,255,255,0.03)",
+                  border:"1px solid rgba(255,255,255,0.05)",padding:"2px 8px",borderRadius:4}}>
+                  {l.visual} {l.en}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Game Over */}
+      {gameOver&&(
+        <div style={{position:"absolute",inset:0,zIndex:35,
+          background:"radial-gradient(ellipse at 50% 40%, rgba(69,10,10,0.92), rgba(0,0,0,0.97))",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          animation:"fadeIn 0.8s ease-out"}}>
+          <div style={{animation:"screenShake 0.5s ease-out"}}>
+            <div style={{fontSize:64,textAlign:"center",marginBottom:8}}>💀</div>
+            <h2 style={{fontFamily:ff,fontSize:36,fontWeight:900,margin:"0 0 8px",textAlign:"center",
+              color:"#ef4444",letterSpacing:4,
+              animation:"gameOverPulse 2s ease-in-out infinite"}}>GAME OVER</h2>
+            <p style={{fontSize:14,color:"#fca5a5",textAlign:"center",marginBottom:8}}>
+              {monster?.name}にやられた...
+            </p>
+          </div>
+
+          <OrnateFrame style={{marginTop:20,marginBottom:24,minWidth:280}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 24px",fontSize:14}}>
+              <span style={{color:"#71717a",textAlign:"right"}}>タイプ</span>
+              <span style={{fontWeight:700}}>{wordsThisBattle}語</span>
+              <span style={{color:"#71717a",textAlign:"right"}}>最大コンボ</span>
+              <span style={{fontWeight:700,color:"#f59e0b"}}>{maxCombo}</span>
+              <span style={{color:"#71717a",textAlign:"right"}}>ミスタイプ</span>
+              <span style={{fontWeight:700,color:"#f87171"}}>{mistakesThisBattle}回</span>
+            </div>
+          </OrnateFrame>
+
+          {battleLog.length>0&&(
+            <div style={{marginBottom:24,maxWidth:420,display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
+              {battleLog.map((l,i)=>(
+                <span key={i} style={{fontSize:11,padding:"3px 10px",background:"rgba(239,68,68,0.12)",
+                  border:"1px solid rgba(239,68,68,0.2)",borderRadius:6,color:"#fca5a5"}}>
+                  {l.visual} {l.en} = {l.ja}</span>
+              ))}
+            </div>
+          )}
+
+          <div style={{display:"flex",gap:12}}>
+            <button onClick={startBattle} style={{fontFamily:ff,padding:"14px 40px",fontSize:16,fontWeight:900,
+              background:"linear-gradient(180deg, #ef4444, #991b1b)",border:"2px solid rgba(252,165,165,0.4)",
+              borderRadius:10,color:"#fff",cursor:"pointer",letterSpacing:3,
+              boxShadow:"0 0 30px rgba(239,68,68,0.3)",transition:"all 0.2s"}}
+              onMouseEnter={e=>e.currentTarget.style.transform="scale(1.05)"}
+              onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+              RETRY ⚔️</button>
+            <button onClick={()=>setScreen("title")} style={{padding:"14px 20px",fontSize:14,fontWeight:700,
+              background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",
+              borderRadius:10,color:"#a1a1aa",cursor:"pointer",transition:"all 0.2s"}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.1)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"}>
+              タイトルへ</button>
+          </div>
+        </div>
+      )}
+
+      {/* Result */}
+      {showResult&&monster&&(
+        <div style={{position:"absolute",inset:0,zIndex:30,
+          background:"radial-gradient(ellipse at 50% 40%, rgba(0,0,0,0.85), rgba(0,0,0,0.96))",
+          display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+          animation:"fadeIn 0.6s ease-out"}}>
+          <Particles color={monster.glow}/>
+          <div style={{position:"relative",zIndex:2,display:"flex",flexDirection:"column",alignItems:"center"}}>
+            <div style={{fontSize:52,marginBottom:4}}>🎉</div>
+            <h2 style={{fontFamily:ff,fontSize:28,fontWeight:900,margin:"0 0 4px",color:"#fbbf24",letterSpacing:3,
+              textShadow:"0 0 20px rgba(251,191,36,0.4)"}}>VICTORY</h2>
+            <p style={{fontSize:14,color:"#d4d4d8",marginBottom:24}}>{monster.name}を倒した！</p>
+            <OrnateFrame style={{marginBottom:20,minWidth:280}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 24px",fontSize:14}}>
+                <span style={{color:"#71717a",textAlign:"right"}}>タイプ</span>
+                <span style={{fontWeight:700}}>{wordsThisBattle}語</span>
+                <span style={{color:"#71717a",textAlign:"right"}}>最大コンボ</span>
+                <span style={{fontWeight:700,color:"#f59e0b"}}>{maxCombo}</span>
+                <span style={{color:"#71717a",textAlign:"right"}}>ミス</span>
+                <span style={{fontWeight:700,color:mistakesThisBattle===0?"#4ade80":"#f87171"}}>
+                  {mistakesThisBattle===0?"PERFECT!":`${mistakesThisBattle}回`}</span>
+                <span style={{color:"#71717a",textAlign:"right"}}>EXP</span>
+                <span style={{fontWeight:700,color:"#a78bfa"}}>+{monster.xp+Math.floor(maxCombo*3)}</span>
+              </div>
+            </OrnateFrame>
+            <div style={{margin:"0 0 28px",maxWidth:420,display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
+              {battleLog.map((l,i)=>(
+                <span key={i} style={{fontSize:11,padding:"3px 10px",background:"rgba(99,102,241,0.12)",
+                  border:"1px solid rgba(99,102,241,0.2)",borderRadius:6,color:"#c7d2fe"}}>
+                  {l.visual} {l.en} = {l.ja}</span>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:12}}>
+              <button onClick={startBattle} style={{fontFamily:ff,padding:"14px 40px",fontSize:16,fontWeight:900,
+                background:"linear-gradient(180deg, #f59e0b, #b45309)",border:"2px solid rgba(253,230,138,0.4)",
+                borderRadius:10,color:"#fff",cursor:"pointer",letterSpacing:3,
+                boxShadow:"0 0 30px rgba(245,158,11,0.3)",transition:"all 0.2s"}}
+                onMouseEnter={e=>e.currentTarget.style.transform="scale(1.05)"}
+                onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+                NEXT ⚔️</button>
+              <button onClick={()=>setScreen("title")} style={{padding:"14px 20px",fontSize:14,fontWeight:700,
+                background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",
+                borderRadius:10,color:"#a1a1aa",cursor:"pointer",transition:"all 0.2s"}}
+                onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.1)"}
+                onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.06)"}>
+                タイトルへ</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+    // Mount
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(WordSlayer));
+  </script>
+</body>
+</html>
